@@ -10,7 +10,8 @@ import WebKit
 
 class ViewController: UIViewController, WKNavigationDelegate {
     var webView:WKWebView!
-    var websites = ["www.apple.com", "www.google.com", "www.facebook.com", "www.twitter.com"]
+    var progressView: UIProgressView!
+    var websites = ["www.apple.com", "www.google.com", "www.facebook.com", "www.twitter.com", "www.youtube.com"]
     
     override func loadView() {
         webView = WKWebView()
@@ -24,7 +25,21 @@ class ViewController: UIViewController, WKNavigationDelegate {
         
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Open", style: .plain, target: self, action: #selector(openLink))
         
-        let url = URL(string: "https://www.apple.com")!
+        let spacer = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
+        let refresh = UIBarButtonItem(barButtonSystemItem: .refresh, target: webView, action: #selector(webView.reload))
+        let goBack = UIBarButtonItem(barButtonSystemItem: .rewind, target: webView, action: #selector(webView.goBack))
+        let goForward = UIBarButtonItem(barButtonSystemItem: .fastForward, target: webView, action: #selector(webView.goForward))
+        progressView = UIProgressView(progressViewStyle: .default)
+        progressView.sizeToFit()
+        
+        let progressButton = UIBarButtonItem(customView: progressView)
+        
+        toolbarItems = [progressButton, spacer, goBack, spacer, goForward, spacer, refresh]
+        navigationController?.isToolbarHidden = false
+        
+        webView.addObserver(self, forKeyPath: #keyPath(WKWebView.estimatedProgress), options: .new, context: nil)
+        
+        let url = URL(string: "https://"+websites[0])!
         webView.load(URLRequest(url: url))
         webView.allowsBackForwardNavigationGestures = true
     }
@@ -47,6 +62,31 @@ class ViewController: UIViewController, WKNavigationDelegate {
     
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         title = webView.title
+    }
+    
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        let url = navigationAction.request.url
+
+        if let host = url?.host {
+            for website in websites {
+                let parsed = website.replacingOccurrences(of: "www.", with: "")
+                if host.contains(parsed) {
+                    decisionHandler(.allow)
+                    return
+                } else {
+                    let ac = UIAlertController(title: "Error", message: "This Site Is Blocked", preferredStyle: .alert)
+                    ac.addAction(UIAlertAction(title: "Okay", style: .default, handler: nil))
+                    present(ac, animated: true)
+                }
+            }
+        }
+        decisionHandler(.cancel)
+    }
+    
+    override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
+        if keyPath == "estimatedProgress" {
+            progressView.progress = Float(webView.estimatedProgress)
+        }
     }
 }
 
